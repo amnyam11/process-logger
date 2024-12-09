@@ -7,8 +7,11 @@
 
 #ifdef WIN32
 #include <windows.h>
+#include <conio.h>
 #else
 #include <sys/time.h>
+#include <unistd.h>
+#include <sys/select.h>
 #endif
 
 const char* MEM_NAME = "counter_mem";
@@ -41,6 +44,47 @@ unsigned long long get_current_time_ms() {
     return tv.tv_sec * 1000ULL + tv.tv_usec / 1000ULL;
 #endif
 }
+
+bool isInputAvailable() {
+#ifdef _WIN32
+    return _kbhit();
+#else
+    fd_set fds;
+    FD_ZERO(&fds);
+    FD_SET(STDIN_FILENO, &fds);
+    struct timeval tv = {0, 0};
+    int ret = select(STDIN_FILENO + 1, &fds, NULL, NULL, &tv);
+    if (ret == -1) {
+        return false;
+    }
+    return ret > 0;
+#endif
+}
+
+std::string readInput() {
+    std::string input;
+#ifdef _WIN32
+    while (true) {
+        if (_kbhit()) {
+            char ch = _getche();
+            if (ch == '\r') {
+                std::cout << std::endl;
+                break;
+            }
+            input += ch;
+        }
+    }
+#else
+    char buffer[256];
+    fgets(buffer, sizeof(buffer), stdin);
+    input = buffer;
+    if (!input.empty() && input.back() == '\n') {
+        input.pop_back();
+    }
+#endif
+    return input;
+}
+
 
 
 int getCurrentPID(){
@@ -114,12 +158,15 @@ int main() {
 
     int pid = getCurrentPID();
     if (pid == data->pid_main_process)
-        writeToLog(getCurrentTime() + " PID: " + std::to_string(pid) + " Start working.");
+        writeToLog(getCurrentTime() + " PID: " + std::to_string(pid) + " Start process.");
 
     unsigned long long lastIncrementTime = get_current_time_ms();
     unsigned long long lastLogTime = get_current_time_ms();
-   
+
+    std::cout << "Input any non-negative integer to change current counter:" << std::endl;
+
     while (true) {
+        
 
         unsigned long long currentTime = get_current_time_ms();
 
@@ -137,7 +184,28 @@ int main() {
             if (pid == data->pid_main_process) {
                 logCounter(shared_data);
             }
-        } 
+        }
+
+        if (isInputAvailable()) {
+            std::string input = readInput();
+            if (!input.empty()) {
+                try {
+                    int newValue = std::stoi(input);
+                    if (newValue >= 0) {
+                        shared_data.Lock();
+                        shared_data.Data()->counter = newValue;
+                        shared_data.Unlock();
+                        std::cout << "Counter set to " << newValue << std::endl;
+                        std::cout << "Input any non-negative integer to change current counter:" << std::endl;
+                    } else {
+                        std::cerr << "Invalid input. Please enter a non-negative integer." << std::endl;
+                    }
+                } catch (const std::exception& e) {
+                    std::cerr << "Invalid input. Please enter a non-negative integer." << std::endl;
+                }
+            }
+        }
+         
 
         sleep_ms(10);
 
