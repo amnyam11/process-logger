@@ -93,7 +93,7 @@ void spawnChildProcess(const std::string& operation) {
         CloseHandle(pi.hThread);
         CloseHandle(pi.hProcess);
     } else {
-        writeToLog("Failed to start Child process: " + operation);
+        writeToLog(" Failed to start Child " + operation);
     }
 #else
     pid_t pid = fork();
@@ -102,12 +102,9 @@ void spawnChildProcess(const std::string& operation) {
         execvp(args[0], const_cast<char* const*>(args));
         std::cerr << "Failed to execute child process: " << strerror(errno) << std::endl;
         exit(1);
-    } else if (pid > 0) {
-
-        writeToLog("Child process started with PID: " + std::to_string(pid));
-    } else {
+    } else if(pid < 0){
         writeToLog("Failed to fork child process.");
-    }
+        }
 #endif
 }
 
